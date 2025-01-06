@@ -1,0 +1,480 @@
+
+
+
+# Server
+shinyServer(function(input, output, session) {
+  
+  #reactividad
+  
+  current_story <- reactiveVal(1)
+  show_storytelling <- reactiveVal(TRUE)
+  modal_visible <- reactiveVal(FALSE) 
+  show_dept_map <- reactiveVal(FALSE)
+  selected_provincia <- reactiveVal(NULL)
+  selected_variable <- reactiveVal("total_comedores") 
+  show_amba <- reactiveVal(FALSE)
+  
+  
+
+  observe({
+    if (show_storytelling()) {
+      shinyjs::runjs("document.getElementById('controls-and-cards').className = 'hidden-during-story';")
+    } else {
+      shinyjs::runjs("document.getElementById('controls-and-cards').className = 'hidden-during-story visible';")
+    }
+  })
+  
+  #actualiza en base a los clicks en los botones
+  observeEvent(input$btn_comedores, {
+    selected_variable("total_comedores")
+  })
+  
+  observeEvent(input$btn_asistentes, {
+    selected_variable("total_asistentes")
+  })
+  
+  observeEvent(input$btn_nbi, {
+    selected_variable("total_nbi")
+  })
+  
+  # actualiza en base a los clicks en el map
+  observeEvent(input$map_selected, {
+    selected_provincia(input$map_selected)
+    show_dept_map(TRUE)
+    print(paste("Provincia seleccionada:", input$map_selected))  
+    if (!input$map_selected %in% c("Buenos Aires", "Ciudad Autónoma de Buenos Aires")) {
+      show_amba(FALSE)
+    }
+  })
+  observeEvent(input$btn_amba, {
+    show_amba(!show_amba())
+    
+    
+  })
+  
+  
+  observeEvent(input$reset_view, {
+    show_amba(FALSE)
+    selected_provincia(NULL)
+  })
+  
+  observe({
+    if (show_dept_map()) {
+      shinyjs::addClass(id = "map-wrapper", class = "dept-map")
+      shinyjs::removeClass(id = "map-wrapper", class = "national-map")
+    } else {
+      shinyjs::addClass(id = "map-wrapper", class = "national-map")
+      shinyjs::removeClass(id = "map-wrapper", class = "dept-map")
+    }
+  })
+  
+  # Agregar un botón para volver al mapa nacional
+  observeEvent(input$return_to_map, {
+    selected_provincia(NULL)
+    show_dept_map(FALSE)
+  })
+  
+  
+  # Reactive expressions for calculations
+  provincia_data <- reactive({
+    req(selected_provincia())
+    filter(agrupados_comedores_provincia, provincia == selected_provincia())
+  })
+  
+  total_comedores_val <- reactive({
+    if (is.null(selected_provincia())) return(sum(agrupados_comedores_provincia$total_comedores))
+    sum(provincia_data()$total_comedores)
+  })
+  
+  total_asistentes_val <- reactive({
+    if (is.null(selected_provincia())) return(sum(agrupados_comedores_provincia$total_asistentes))
+    sum(provincia_data()$total_asistentes)
+  })
+  
+  total_nbi_val <- reactive({
+    if (is.null(selected_provincia())) return(sum(agrupados_comedores_provincia$total_asistentes * 0.1))
+    sum(provincia_data()$total_asistentes * 0.1)
+  })
+  
+  Purp <- c("#FDE0DD", "#FCC5C0", "#FA9FB5", "#F768A1", "#DD3497", "#AE017E", "#7A0177")
+  
+  get_color_scale <- function(var, is_dept_map = FALSE, provincia = NULL) {
+    if (is_dept_map && !is.null(provincia)) {
+      data_range <- range(mapa_comedores_deptos %>% 
+                            filter(provincia_nombre == provincia) %>% 
+                            pull(!!sym(var)), 
+                          na.rm = TRUE)
+    } else {
+      data_range <- range(mapa_comedores_provincia[[var]], na.rm = TRUE)
+    }
+    
+    if (var == "total_comedores") {
+      scale_fill_gradientn(
+        colours = Purp[c(2,6,5)],  
+        name = "Total Comedores",
+        limits = data_range,
+        na.value = "white"
+      )
+    } else if (var == "total_asistentes") {
+      scale_fill_gradientn(
+        colours = Purp[c(1,5,6)],  
+        name = "Total Asistentes",
+        limits = data_range,
+        na.value = "white"
+      )
+    } else {
+      scale_fill_gradientn(
+        colours = Purp[c(1,6,5)],  
+        name = "NBI",
+        limits = data_range,
+        na.value = "white"
+      )
+    }
+  } 
+  
+  # Observers para el modal
+  observeEvent(input$show_info, {
+    modal_visible(!modal_visible())
+  })
+  
+  observeEvent(input$overlay_click, {
+    modal_visible(FALSE)
+  })
+  
+  observeEvent(input$close_info, {
+    modal_visible(FALSE)
+  }) 
+  # Contenido del storytelling
+  output$storytelling <- renderUI({
+    if (!show_storytelling()) return(NULL)
+    
+    story_content <- switch(current_story(),
+                            "1" = list(
+                              text = "De acuerdo al último informe del Observatorio de Deuda Social de la UCA (diciembre 2024), 1 de cada 4 hogares argentinos no tiene todas comidas diarias.",
+                              color = "#3b8d99"
+                            ),
+                            "2" = list(
+                              text = "Los comedores y merenderos sostienen la vida de miles de personas que se encuentran en condición de inseguridad alimentaria.",
+                              color = "#3b8d99"
+                            ),
+                            "3" = list(
+                              text = "Cada sección en este mapa oculta todo ese trabajo. Generalmente, realizado por mujeres de clases de populares",
+                              color = "#3b8d99"
+                            ),
+                            "4" = list(
+                              text = "Conocé más sobre estos datos.",
+                              color = "#3b8d99"
+                            )
+    )
+    
+    div(
+      id = "storytelling-overlay",
+      style = sprintf("background-color: %s99;", story_content$color),
+      div(
+        class = "story-content",
+        if (current_story() > 1) 
+          div(class = "story-nav-prev",
+              actionButton("prev_story",  bs_icon("chevron-down"), class = "scroll-btn")),
+        p(story_content$text),
+        if (current_story() < 4) 
+          div(class = "story-nav-next",
+              actionButton("next_story",  bs_icon("chevron-down"), class = "scroll-btn"))
+        else 
+          div(class = "story-nav-next",
+              actionButton("start_explore", "Explorar el mapa", class = "story-nav-btn"))
+      )
+    )
+    
+  })
+  
+  # Navegación del storytelling
+  observeEvent(input$next_story, {
+    current_story(current_story() + 1)
+  })
+  
+  observeEvent(input$prev_story, {
+    current_story(current_story() - 1)
+  })
+  
+  observeEvent(input$start_explore, {
+    show_storytelling(FALSE)
+  })
+  
+  observeEvent(input$return_to_map, {
+    selected_provincia(NULL)
+    show_dept_map(FALSE)
+  })
+  
+  # Output del modal
+  output$info_modal <- renderUI({
+    if(modal_visible()) {
+      tagList(
+        # Overlay oscuro
+        div(
+          id = "modal-overlay",
+          style = "position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+                 background: rgba(0,0,0,0.5); z-index: 1000;",
+          onclick = "Shiny.setInputValue('overlay_click', Math.random())"
+        ),
+        # Modal
+        div(
+          style = "position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+                 background: white; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.5);
+                 z-index: 1001; max-width: 500px;",
+          div(
+            style = "position: absolute; top: 10px; right: 10px; cursor: pointer;",
+            actionButton("close_info", "×", 
+                         style = "background: none; border: none; font-size: 20px;")
+          ),
+          h3("Fuentes de datos", style = "color: #3b8d99; margin-bottom: 15px;"),
+          div(
+            style = "margin-bottom: 15px;",
+            h4("Datos de comedores y merenderos:", style = "color: #4e5b61;"),
+            p("Los datos provienen del Registro Nacional de Comedores y Merenderos Comunitarios (ReNaCoM) 
+              actualizado a mayo del 2023. Provienen de un pedido de información pública mediante TAD."),
+            h4("Datos geográficos:", style = "color: #4e5b61;"),
+            p("La información geográfica se obtiene a través del paquete geoAr, que proporciona datos
+              oficiales de límites administrativos de Argentina."),
+            h4("Procesamiento:", style = "color: #4e5b61;"),
+            p("Los datos han sido procesados y agregados a nivel provincial y departamental para su
+              visualización en este dashboard. Podés ver el paso a paso acá."),
+            h5 ("Contacto:", style=  "color: #4e5b61;"),
+            div(
+              style = "display: flex; align-items: center; gap: 8px;",
+              bs_icon("envelope-at"),
+              p("azcurrakaren@gmail.com", style = "margin: 0;"),
+              div(
+                style = "display: flex; align-items: center; gap: 8px;",
+                bs_icon("linkedin"),
+                a(href = "https://www.linkedin.com/in/karen-azcurra/", 
+                  "karen-azcurra", 
+                  target = "_blank")
+              )
+            )
+          )
+        )
+      )
+    }
+  })
+  
+  # Cerrar modal al hacer clic en el overlay
+  observeEvent(input$overlay_click, {
+    updateActionButton(session, "show_info", label = "¿De dónde salen estos datos?")
+  })
+  
+  # Cerrar modal con el botón X
+  observeEvent(input$close_info, {
+    updateActionButton(session, "show_info", label = "¿De dónde salen estos datos?")
+  })
+  
+  
+  
+  
+  # Outputs
+  output$selected_provincia <- renderText({
+    if (is.null(selected_provincia())) return("Seleccione una provincia")
+    paste("Provincia seleccionada:", selected_provincia())
+  })
+  
+  output$total_comedores <- renderText({
+    paste("Total de Comedores:", format(total_comedores_val(), big.mark = ","))
+  })
+  
+  output$total_asistentes <- renderText({
+    paste("Total de Personas Beneficiadas:", format(total_asistentes_val(), big.mark = ","))
+  })
+  
+  output$total_nbi <- renderText({
+    paste("Índice Necesidades Básicas Insatisfechas:", format(round(total_nbi_val(), 2), big.mark = ","))
+  })
+  
+  #PLOT
+  output$info_plot <- renderGirafe({
+    var <- selected_variable() 
+    titulo <- if(var == "total_comedores") {
+      "Top 5 provincias con más comedores"
+    } else if(var == "total_asistentes") {
+      "Top 5 provincias con más asistentes"
+    } else {
+      "Top 5 provincias con mayor NBI"
+    }
+    
+    plot_data <- if (is.null(selected_provincia())) {
+      agrupados_comedores_provincia %>%
+        mutate(provincia_wrap = str_wrap(provincia, width = 15)) %>%
+        arrange(desc(!!sym(var))) %>%
+        slice_head(n = 5)
+    } else {
+      provincia_data() %>%
+        mutate(provincia_wrap = str_wrap(provincia, width = 15))
+    }
+    
+    
+    gg <- ggplot(plot_data, aes(x = reorder(provincia_wrap, -!!sym(var)), y = !!sym(var))) +
+      geom_col_interactive(
+        aes(tooltip = paste0("Provincia: ", provincia, "\n",
+                             ifelse(var == "total_comedores", "Total de Comedores: ",
+                                    ifelse(var == "total_asistentes", "Total de Asistentes: ",
+                                           "NBI: ")),
+                             format(!!sym(var), big.mark = ",")),
+            data_id = provincia),
+        fill = "#F768A1" ,
+        width = 0.7
+      ) +
+      labs(
+        title = titulo ,
+        x = NULL,
+        y = NULL
+      ) +
+      theme_minimal() +
+      theme(
+        plot.title = element_text(
+          hjust = 0.5, 
+          color = "#3b8d99",
+          size = 30,
+          family = "sans"
+        ),
+        axis.text.x = element_text(
+          color = "#515456",
+          size = 15,
+          family = "sans"
+        ),
+        axis.text.y = element_text(
+          color = "#515456",
+          size = 12,
+          family = "sans"
+        ),
+        panel.grid.major.x = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.background = element_rect(fill = "transparent", color = NA),
+        panel.background = element_rect(fill = "transparent", color = NA)
+      )
+    
+    
+    girafe(
+      ggobj = gg,
+      options = list(
+        opts_hover(css = "fill:stealblue;"),
+        opts_tooltip(css = "background-color:grey;color:black;padding:10px;border-radius:5px;"),
+        opts_selection(type = "single", css = "fill:#3b8d99;")
+      ),
+      width_svg = 8,
+      height_svg = 6,
+      bg = "transparent"
+    )
+  })
+  
+  
+  
+  #MAPAS
+  output$map <- renderGirafe({
+    tryCatch({
+      var <- selected_variable()
+      
+      if (is.null(selected_provincia()) || !show_dept_map()) {
+        # mapa nacional 
+        mapa_base <- ggplot() +
+          geom_sf_interactive(
+            data = mapa_comedores_provincia, 
+            aes(fill = !!sym(var), tooltip = Provincia, data_id = Provincia), 
+            color = "white",
+            linewidth = 0.1
+          ) +
+          get_color_scale(var) +
+          theme_void() +
+          theme(
+            plot.background = element_rect(fill = "transparent", color = NA),
+            panel.background = element_rect(fill = "transparent", color = NA),
+            legend.position = if(show_storytelling()) "none" else c(1, 0.3),
+            legend.text = element_text(size = 8),
+            legend.title = element_text(size = 9),
+            legend.key.size = unit(0.4, "cm")
+          )
+        
+      } else {
+        # Filtra los departamentos de la provincia seleccionada
+        deptos_provincia <- mapa_comedores_deptos %>% 
+          filter(provincia_nombre %in% c(selected_provincia(), 
+                                         if(show_amba() && selected_provincia() == "Buenos Aires") "Ciudad Autónoma de Buenos Aires" else NULL)) %>%
+          st_cast("MULTIPOLYGON") %>%
+          st_make_valid()
+        
+        # filtra AMBA si corresponde
+        if (show_amba() && selected_provincia() %in% c("Buenos Aires", "Ciudad Autónoma de Buenos Aires")) {
+          deptos_provincia <- deptos_provincia %>%
+            filter(nombre %in% amba_municipios)
+        }
+        
+        bbox <- st_bbox(deptos_provincia)
+        
+        # defino AMBA 
+        is_amba <- show_amba() && selected_provincia() %in% c("Buenos Aires", "Ciudad Autónoma de Buenos Aires")
+        
+        # Mapa departamental con especificaciones para AMBA
+        mapa_base <- ggplot() +
+          geom_sf(
+            data = deptos_provincia,
+            fill = "white",
+            color = "gray",
+            linewidth = 0.1
+          ) +
+          geom_sf_interactive(
+            data = deptos_provincia %>% filter(!is.na(!!sym(var))),
+            aes(
+              fill = !!sym(var),
+              tooltip = paste0(
+                "Departamento: ", nombre, "\n",
+                case_when(
+                  var == "total_comedores" ~ "Comedores: ",
+                  var == "total_asistentes" ~ "Asistentes: ",
+                  TRUE ~ "NBI: "
+                ),
+                format(!!sym(var), big.mark = ",")
+              )
+            ),
+            color = "white",
+            linewidth = 0.1
+          ) +
+          get_color_scale(var, TRUE, selected_provincia()) +
+          labs(title = if(show_amba()) "AMBA" else selected_provincia()) +
+          coord_sf(
+            xlim = if(is_amba) c(bbox["xmin"] - 0.3, bbox["xmax"] + 0.1) else c(bbox["xmin"] - 0.2, bbox["xmax"] + 1.5),
+            ylim = if(is_amba) c(bbox["ymin"] - 0.05, bbox["ymax"] + 0.05) else c(bbox["ymin"] - 0.2, bbox["ymax"] + 0.2),
+            expand = FALSE
+          ) +
+          theme_void() +
+          theme(
+            plot.title = element_text(
+              hjust = 0.5,
+              color = "#3b8d99",
+              size = if(is_amba) 20 else 16,
+              family = "sans"
+            ),
+            plot.background = element_rect(fill = "transparent", color = NA),
+            panel.background = element_rect(fill = "transparent", color = NA),
+            legend.position = "right",
+            legend.text = element_text(size = if(is_amba) 10 else 8),
+            legend.title = element_text(size = if(is_amba) 12 else 9)
+          )
+      }
+      
+    
+      is_amba <- !is.null(selected_provincia()) && 
+        show_amba() && 
+        selected_provincia() %in% c("Buenos Aires", "Ciudad Autónoma de Buenos Aires")
+      
+      girafe(ggobj = mapa_base,
+             width_svg = if(is_amba) 8 else if(show_dept_map()) 5 else 4,
+             height_svg = if(is_amba) 8 else 6) %>%
+        girafe_options(
+          opts_tooltip(css = "background-color:black;color:white;"),
+          opts_zoom(min = 1, max = if(is_amba) 2 else 1),
+          opts_sizing(rescale = TRUE, width = 1),
+          opts_toolbar(saveaspng = FALSE),
+          opts_hover(css = "fill:#3b8d99;"),
+          opts_selection(type = "single")
+        )
+    })
+  })
+})
+
