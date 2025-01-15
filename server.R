@@ -75,7 +75,7 @@ shinyServer(function(input, output, session) {
   })
   
   
-  # Reactive expressions for calculations
+  # Reactividad
   provincia_data <- reactive({
     req(selected_provincia())
     filter(agrupados_comedores_provincia, provincia == selected_provincia())
@@ -92,45 +92,71 @@ shinyServer(function(input, output, session) {
   })
   
   total_nbi_val <- reactive({
-    if (is.null(selected_provincia())) return(sum(agrupados_comedores_provincia$total_asistentes * 0.1))
-    sum(provincia_data()$total_asistentes * 0.1)
+    if (is.null(selected_provincia())) {
+      return(mean(mapa_comedores_provincia$porcentaje, na.rm = TRUE))
+    }
+
+    mean(mapa_comedores_provincia$porcentaje[mapa_comedores_provincia$Provincia == selected_provincia()], na.rm = TRUE)
   })
   
   Purp <- c("#FDE0DD", "#FCC5C0", "#FA9FB5", "#F768A1", "#DD3497", "#AE017E", "#7A0177")
   
   get_color_scale <- function(var, is_dept_map = FALSE, provincia = NULL) {
-    if (is_dept_map && !is.null(provincia)) {
-      data_range <- range(mapa_comedores_deptos %>% 
-                            filter(provincia_nombre == provincia) %>% 
-                            pull(!!sym(var)), 
-                          na.rm = TRUE)
+    if (var == "total_nbi") {
+      #NBI
+      if (is_dept_map && !is.null(provincia)) {
+        valores_nbi <- mapa_deptos_nbi %>%
+          filter(Provincia == provincia) %>%
+          pull(porcentaje_NBI_depto_pobl)
+      } else {
+        valores_nbi <- mapa_comedores_provincia$porcentaje
+      }
+      
+      # Asegurar valores numéricos válidos
+      valores_nbi <- as.numeric(as.character(valores_nbi))
+      valores_nbi <- valores_nbi[!is.infinite(valores_nbi) & !is.na(valores_nbi)]
+      
+      if(length(valores_nbi) > 0) {
+        data_range <- range(valores_nbi, na.rm = TRUE)
+      } else {
+        data_range <- c(0, 100)  
+      }
+      
+      scale_fill_gradientn(
+        colours = Purp[c(1,6,5)],
+        name = "NBI (%)",
+        limits = data_range,
+        na.value = "white"
+      )
+      
     } else {
-      data_range <- range(mapa_comedores_provincia[[var]], na.rm = TRUE)
+      # Para comedores y asistentes
+      if (is_dept_map && !is.null(provincia)) {
+        data_range <- range(mapa_comedores_deptos %>% 
+                              filter(provincia_nombre == provincia) %>% 
+                              pull(!!sym(var)), 
+                            na.rm = TRUE)
+      } else {
+        data_range <- range(mapa_comedores_provincia[[var]], na.rm = TRUE)
+      }
+      
+      if (var == "total_comedores") {
+        scale_fill_gradientn(
+          colours = Purp[c(2,6,5)],  
+          name = "Total Comedores",
+          limits = data_range,
+          na.value = "white"
+        )
+      } else if (var == "total_asistentes") {
+        scale_fill_gradientn(
+          colours = Purp[c(1,5,6)],  
+          name = "Total Asistentes",
+          limits = data_range,
+          na.value = "white"
+        )
+      }
     }
-    
-    if (var == "total_comedores") {
-      scale_fill_gradientn(
-        colours = Purp[c(2,6,5)],  
-        name = "Total Comedores",
-        limits = data_range,
-        na.value = "white"
-      )
-    } else if (var == "total_asistentes") {
-      scale_fill_gradientn(
-        colours = Purp[c(1,5,6)],  
-        name = "Total Asistentes",
-        limits = data_range,
-        na.value = "white"
-      )
-    } else {
-      scale_fill_gradientn(
-        colours = Purp[c(1,6,5)],  
-        name = "NBI",
-        limits = data_range,
-        na.value = "white"
-      )
-    }
-  } 
+  }
   
   # Observers para el modal
   observeEvent(input$show_info, {
@@ -232,12 +258,16 @@ shinyServer(function(input, output, session) {
             h4("Datos de comedores y merenderos:", style = "color: #4e5b61;"),
             p("Los datos provienen del Registro Nacional de Comedores y Merenderos Comunitarios (ReNaCoM) 
               actualizado a mayo del 2023. Provienen de un pedido de información pública mediante TAD."),
+            h4("Datos de Necesidades Básicas Insatisfechas:", style = "color: #4e5b61;"),
+            p("Los datos fueron tomados del CENSO 2022 obtenidos a través de la plataforma REDATAM. Corresponde a los datos de la población total en viviendas particulares."),
             h4("Datos geográficos:", style = "color: #4e5b61;"),
             p("La información geográfica se obtiene a través del paquete geoAr, que proporciona datos
               oficiales de límites administrativos de Argentina."),
             h4("Procesamiento:", style = "color: #4e5b61;"),
             p("Los datos han sido procesados y agregados a nivel provincial y departamental para su
-              visualización en este dashboard. Podés ver el paso a paso acá."),
+              visualización en este dashboard. Podés ver el paso a paso", a(href = "https://www.linkedin.com/in/karen-azcurra/", 
+                                                                                "acá.", 
+                                                                                target = "_blank")),
             h5 ("Contacto:", style=  "color: #4e5b61;"),
             div(
               style = "display: flex; align-items: center; gap: 8px;",
@@ -299,32 +329,71 @@ shinyServer(function(input, output, session) {
       "Top 5 provincias con mayor NBI"
     }
     
-    plot_data <- if (is.null(selected_provincia())) {
-      agrupados_comedores_provincia %>%
+    if(var == "total_nbi") {
+      plot_data <- mapa_comedores_provincia %>%
+        mutate(provincia_wrap = str_wrap(Provincia, width = 15)) %>%
+        arrange(desc(porcentaje)) %>%
+        slice_head(n = 5)
+      
+      gg <- ggplot(plot_data, 
+                   aes(x = reorder(provincia_wrap, -porcentaje), 
+                       y = porcentaje)) +
+        geom_col_interactive(
+          aes(tooltip = paste0("Provincia: ", Provincia, "\n",
+                               "NBI: ", format(round(porcentaje, 1), decimal.mark=","), "%")),
+          fill = "#F768A1",
+          width = 0.7
+        ) +
+        geom_text(aes(label = paste0(format(round(porcentaje, 1), decimal.mark=","), "%")),
+                  vjust = -0.5,
+                  size = 4) +
+        scale_y_continuous(
+          labels = function(x) paste0(format(x, decimal.mark=","), "%"),
+          limits = c(0, max(plot_data$porcentaje) * 1.1)  
+        )
+      
+    } else {
+      
+      plot_data <- agrupados_comedores_provincia %>%
         mutate(provincia_wrap = str_wrap(provincia, width = 15)) %>%
         arrange(desc(!!sym(var))) %>%
         slice_head(n = 5)
+    
+    titulo <- if(var == "total_comedores") {
+      "Top 5 provincias con más comedores"
+    } else if(var == "total_asistentes") {
+      "Top 5 provincias con más asistentes"
     } else {
-      provincia_data() %>%
-        mutate(provincia_wrap = str_wrap(provincia, width = 15))
+      "Top 5 provincias con mayor NBI"
     }
     
-    
-    gg <- ggplot(plot_data, aes(x = reorder(provincia_wrap, -!!sym(var)), y = !!sym(var))) +
+    gg <- ggplot(plot_data, 
+                 aes(x = reorder(provincia_wrap, -!!sym(var)), 
+                     y = !!sym(var))) +
       geom_col_interactive(
         aes(tooltip = paste0("Provincia: ", provincia, "\n",
-                             ifelse(var == "total_comedores", "Total de Comedores: ",
-                                    ifelse(var == "total_asistentes", "Total de Asistentes: ",
-                                           "NBI: ")),
-                             format(!!sym(var), big.mark = ",")),
-            data_id = provincia),
-        fill = "#F768A1" ,
+                             ifelse(var == "total_comedores", 
+                                    "Total de Comedores: ", 
+                                    "Total de Asistentes: "),
+                             format(!!sym(var), big.mark = ","))),
+        fill = "#F768A1",
         width = 0.7
-      ) +
+      )
+    }
+    
+    titulo <- if(var == "total_comedores") {
+      "Top 5 provincias con más comedores"
+    } else if(var == "total_asistentes") {
+      "Top 5 provincias con más asistentes"
+    } else {
+      "Top 5 provincias con mayor NBI"
+    }
+    
+    gg <- gg +
       labs(
-        title = titulo ,
+        title = titulo,
         x = NULL,
-        y = NULL
+        y = if(var == "total_nbi") "Porcentaje NBI" else NULL
       ) +
       theme_minimal() +
       theme(
@@ -350,7 +419,6 @@ shinyServer(function(input, output, session) {
         panel.background = element_rect(fill = "transparent", color = NA)
       )
     
-    
     girafe(
       ggobj = gg,
       options = list(
@@ -372,69 +440,110 @@ shinyServer(function(input, output, session) {
       var <- selected_variable()
       
       if (is.null(selected_provincia()) || !show_dept_map()) {
-        # mapa nacional 
-        mapa_base <- ggplot() +
-          geom_sf_interactive(
-            data = mapa_comedores_provincia, 
-            aes(fill = !!sym(var), tooltip = Provincia, data_id = Provincia), 
-            color = "white",
-            linewidth = 0.1
-          ) +
+        # Mapa nacional 
+        if(var == "total_nbi") {
+          mapa_data <- mapa_comedores_provincia %>%
+            mutate(porcentaje = as.numeric(as.character(porcentaje))) 
+          
+          mapa_base <- ggplot() +
+            geom_sf_interactive(
+              data = mapa_comedores_provincia,
+              aes(fill = porcentaje,
+                  tooltip = paste0("Provincia: ", Provincia, "\n",
+                                   "NBI: ", format(round(porcentaje, 1), decimal.mark=","), "%"),
+                  data_id = Provincia),
+              color = "white",
+              linewidth = 0.1
+            )
+        } else {
+          mapa_base <- ggplot() +
+            geom_sf_interactive(
+              data = mapa_comedores_provincia, 
+              aes(fill = !!sym(var), 
+                  tooltip = paste0("Provincia: ", Provincia, "\n",
+                                   if(var == "total_comedores") "Comedores: " else "Asistentes: ",
+                                   format(!!sym(var), big.mark = ",")),
+                  data_id = Provincia), 
+              color = "white",
+              linewidth = 0.1
+            )
+        }
+        
+        mapa_base <- mapa_base +
           get_color_scale(var) +
           theme_void() +
           theme(
             plot.background = element_rect(fill = "transparent", color = NA),
             panel.background = element_rect(fill = "transparent", color = NA),
-            legend.position = if(show_storytelling()) "none" else c(1, 0.3),
+            legend.position = c(1, 0.3),
             legend.text = element_text(size = 8),
             legend.title = element_text(size = 9),
             legend.key.size = unit(0.4, "cm")
           )
         
       } else {
-        # Filtra los departamentos de la provincia seleccionada
-        deptos_provincia <- mapa_comedores_deptos %>% 
-          filter(provincia_nombre %in% c(selected_provincia(), 
-                                         if(show_amba() && selected_provincia() == "Buenos Aires") "Ciudad Autónoma de Buenos Aires" else NULL)) %>%
-          st_cast("MULTIPOLYGON") %>%
-          st_make_valid()
+        # Mapa departamental
+        if(var == "total_nbi") {
+          deptos_provincia <- mapa_deptos_nbi %>% 
+            filter(provincia_nombre %in% c(selected_provincia(), 
+                                           if(show_amba() && selected_provincia() == "Buenos Aires") 
+                                             "Ciudad Autónoma de Buenos Aires" else NULL)) %>%
+            st_cast("MULTIPOLYGON") %>%
+            st_make_valid()
+          
+          validate(
+            need(any(!is.na(deptos_provincia$porcentaje_NBI_depto_pobl)), 
+                 paste("No hay datos NBI para la provincia:", selected_provincia()))
+          )
+        } else {
+          deptos_provincia <- mapa_comedores_deptos %>% 
+            filter(provincia_nombre %in% c(selected_provincia(), 
+                                           if(show_amba() && selected_provincia() == "Buenos Aires") 
+                                             "Ciudad Autónoma de Buenos Aires" else NULL)) %>%
+            st_cast("MULTIPOLYGON") %>%
+            st_make_valid()
+        }
         
-        # filtra AMBA si corresponde
         if (show_amba() && selected_provincia() %in% c("Buenos Aires", "Ciudad Autónoma de Buenos Aires")) {
           deptos_provincia <- deptos_provincia %>%
             filter(nombre %in% amba_municipios)
         }
         
         bbox <- st_bbox(deptos_provincia)
-        
-        # defino AMBA 
         is_amba <- show_amba() && selected_provincia() %in% c("Buenos Aires", "Ciudad Autónoma de Buenos Aires")
         
-        # Mapa departamental con especificaciones para AMBA
-        mapa_base <- ggplot() +
-          geom_sf(
-            data = deptos_provincia,
-            fill = "white",
-            color = "gray",
-            linewidth = 0.1
-          ) +
-          geom_sf_interactive(
-            data = deptos_provincia %>% filter(!is.na(!!sym(var))),
-            aes(
-              fill = !!sym(var),
-              tooltip = paste0(
-                "Departamento: ", nombre, "\n",
-                case_when(
-                  var == "total_comedores" ~ "Comedores: ",
-                  var == "total_asistentes" ~ "Asistentes: ",
-                  TRUE ~ "NBI: "
-                ),
-                format(!!sym(var), big.mark = ",")
-              )
-            ),
-            color = "white",
-            linewidth = 0.1
-          ) +
+        mapa_base <- ggplot()
+        
+        if(var == "total_nbi") {
+          mapa_base <- mapa_base +
+            geom_sf_interactive(
+              data = deptos_provincia %>% 
+                filter(!is.na(porcentaje_NBI_depto_pobl)),
+              aes(fill = porcentaje_NBI_depto_pobl,
+                  tooltip = paste0("Departamento: ", nombre, "\n",
+                                   "NBI: ", format(round(porcentaje_NBI_depto_pobl, 1), decimal.mark=","), "%"),
+                  data_id = nombre),
+              color = "white",
+              linewidth = 0.1
+            )
+        } else {
+          mapa_base <- mapa_base +
+            geom_sf_interactive(
+              data = deptos_provincia %>% filter(!is.na(!!sym(var))),
+              aes(
+                fill = !!sym(var),
+                tooltip = paste0(
+                  "Departamento: ", nombre, "\n",
+                  if(var == "total_comedores") "Comedores: " else "Asistentes: ",
+                  format(!!sym(var), big.mark = ",")
+                )
+              ),
+              color = "white",
+              linewidth = 0.1
+            )
+        }
+        
+        mapa_base <- mapa_base +
           get_color_scale(var, TRUE, selected_provincia()) +
           labs(title = if(show_amba()) "AMBA" else selected_provincia()) +
           coord_sf(
@@ -458,7 +567,6 @@ shinyServer(function(input, output, session) {
           )
       }
       
-    
       is_amba <- !is.null(selected_provincia()) && 
         show_amba() && 
         selected_provincia() %in% c("Buenos Aires", "Ciudad Autónoma de Buenos Aires")
@@ -474,7 +582,8 @@ shinyServer(function(input, output, session) {
           opts_hover(css = "fill:#3b8d99;"),
           opts_selection(type = "single")
         )
+    }, error = function(e) {
+      print(paste("Error en el mapa:", e))
     })
   })
-})
-
+}) 

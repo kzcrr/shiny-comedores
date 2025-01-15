@@ -10,6 +10,11 @@ library(readxl)
 
 codigos<- read_xlsx("C:/Users/kazcu/Desktop/Renacom/codigos_pais_dept.xlsx")
 
+NBI <- readxl::read_excel("C:/Users/kazcu/Desktop/Shinny/shiny/comedores/total_depto_nbi.xlsx")
+
+NBI$etiqueta <- paste(NBI$Provincia, NBI$Departamento, sep = ", ")
+
+
 #bajamos polígonos de la libreria geoAr
 
 mapa_argentina_provincias <- get_geo("ARGENTINA", level = "provincia")
@@ -35,6 +40,8 @@ deptos_actualizado <- deptos %>%
   left_join(codigos %>% select(etiqueta, nuevo_id = `Código concatenado`), by = "etiqueta") %>%
   mutate(id = ifelse(!is.na(nuevo_id), nuevo_id, id)) %>%
   select(-nuevo_id)  
+
+
 
 
 mapa_argentina_departamentos <- mapa_argentina_departamentos %>%
@@ -109,6 +116,31 @@ agrupados_comedores_provincia <- comedoreslimpio %>%
     promedio_asistentes = round(mean(cantidad_asistentes, na.rm = TRUE)))
 
 #mapa_deptos
+
+
+#limpio valores invisibles que me devuelve NA
+
+raw_values <- grep("Berazategui", NBI$etiqueta, value = TRUE)
+sapply(raw_values, charToRaw)
+
+NBI$etiqueta <- gsub("\u00A0", " ", NBI$etiqueta)
+mapa_completo1$etiqueta <- gsub("\u00A0", " ", mapa_completo1$etiqueta)
+
+identical(mapa_completo1$etiqueta[mapa_completo1$etiqueta == "Buenos Aires, Berazategui"],
+          NBI$etiqueta[NBI$etiqueta == "Buenos Aires, Berazategui"])
+
+
+
+mapa_deptos_nbi <- mapa_completo1 %>%
+  left_join(
+    NBI, by = "etiqueta"
+  )
+
+write_sf(mapa_deptos_nbi, "C:/Users/kazcu/Desktop/Shinny/shiny/comedores/mapa_nbi_depto_.geojson")
+
+---
+
+
 mapa_completo2 <- mapa_completo1 %>%
   left_join(agrupados_comedores, by = "etiqueta")
 
