@@ -17,6 +17,40 @@ shinyUI(page_fluid(
         padding: 0;
         overflow: hidden;
       }
+       
+      .modal-dialog {
+        width: 500px !important;  
+        max-width: 90% !important;  
+      }
+      .modal-content {
+        max-height: 80vh;  
+      }
+      
+      .modal-body {
+        max-height: calc(80vh - 120px);  
+        overflow-y: auto;  
+        padding: 15px;
+      }
+      .contact-info {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      .nbi-list {
+    list-style: none; 
+    padding-left: 20px;
+    margin-top: 10px;
+  }
+  .nbi-list li {
+    margin-bottom: 8px;
+    text-indent: -1em;  /* Sangría negativa para el guión */
+    
+  }
+  .nbi-list li::before {
+    content: '● ';     /* Agrega el guión */
+    color: #4e5b61;    /* Color del guión */
+  }
       #map-wrapper {
         position: absolute;
         top: 0;

@@ -13,7 +13,7 @@ shinyServer(function(input, output, session) {
   selected_provincia <- reactiveVal(NULL)
   selected_variable <- reactiveVal("total_comedores") 
   show_amba <- reactiveVal(FALSE)
-  
+  show_legend <- reactive(!show_storytelling())
   
 
   observe({
@@ -93,7 +93,7 @@ shinyServer(function(input, output, session) {
   
   total_nbi_val <- reactive({
     if (is.null(selected_provincia())) {
-      return(mean(mapa_comedores_provincia$porcentaje, na.rm = TRUE))
+      return(9.4)
     }
 
     mean(mapa_comedores_provincia$porcentaje[mapa_comedores_provincia$Provincia == selected_provincia()], na.rm = TRUE)
@@ -123,7 +123,7 @@ shinyServer(function(input, output, session) {
       }
       
       scale_fill_gradientn(
-        colours = Purp[c(1,6,5)],
+        colours = Purp[c(2,6,5)],
         name = "NBI (%)",
         limits = data_range,
         na.value = "white"
@@ -149,7 +149,7 @@ shinyServer(function(input, output, session) {
         )
       } else if (var == "total_asistentes") {
         scale_fill_gradientn(
-          colours = Purp[c(1,5,6)],  
+          colours = Purp[c(1,6,5)],  
           name = "Total Asistentes",
           limits = data_range,
           na.value = "white"
@@ -233,59 +233,67 @@ shinyServer(function(input, output, session) {
   
   # Output del modal
   output$info_modal <- renderUI({
-    if(modal_visible()) {
-      tagList(
-        # Overlay oscuro
-        div(
-          id = "modal-overlay",
-          style = "position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-                 background: rgba(0,0,0,0.5); z-index: 1000;",
-          onclick = "Shiny.setInputValue('overlay_click', Math.random())"
-        ),
-        # Modal
-        div(
-          style = "position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
-                 background: white; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.5);
-                 z-index: 1001; max-width: 500px;",
+    observeEvent(input$show_info, {
+      showModal(
+        modalDialog(
+          title = "Fuentes de datos",
           div(
-            style = "position: absolute; top: 10px; right: 10px; cursor: pointer;",
-            actionButton("close_info", "×", 
-                         style = "background: none; border: none; font-size: 20px;")
-          ),
-          h3("Fuentes de datos", style = "color: #3b8d99; margin-bottom: 15px;"),
-          div(
-            style = "margin-bottom: 15px;",
+            style = "font-size: 14px;",
             h4("Datos de comedores y merenderos:", style = "color: #4e5b61;"),
             p("Los datos provienen del Registro Nacional de Comedores y Merenderos Comunitarios (ReNaCoM) 
-              actualizado a mayo del 2023. Provienen de un pedido de información pública mediante TAD."),
+            actualizado a mayo del 2023. Provienen de un pedido de información pública mediante TAD."),
+            
             h4("Datos de Necesidades Básicas Insatisfechas:", style = "color: #4e5b61;"),
-            p("Los datos fueron tomados del CENSO 2022 obtenidos a través de la plataforma REDATAM. Corresponde a los datos de la población total en viviendas particulares."),
+            p("Los datos fueron tomados del CENSO 2022 obtenidos a través de la plataforma REDATAM. 
+            Corresponde a los datos de la población total en viviendas particulares.
+            El INDEC considera a las Necesidades básicas insatisfechas a hogares que presentan al menos 
+            uno de los siguientes indicadores de privación:"),
+            tags$ul(
+              class = "nbi-list",
+              tags$li("Hacinamiento: hogares que tienen más de tres personas por cuarto."),
+              tags$li("Vivienda: hogares en una vivienda de tipo inconveniente (pieza de inquilinato, vivienda 
+    precaria u otro tipo, lo que excluye casa, departamento y rancho)."),
+              tags$li("Condiciones sanitarias: hogares que no tienen acceso a baño o letrina."),
+              tags$li("Asistencia escolar: hogares que tienen algún niño en edad escolar (6 a 12 años) que no 
+    asiste a la escuela."),
+              tags$li("Capacidad de subsistencia: hogares que tienen cuatro o más personas por miembro ocupado y, 
+    además, cuyo jefe no haya completado el tercer grado de escolaridad primaria.")
+            ),
+            
             h4("Datos geográficos:", style = "color: #4e5b61;"),
             p("La información geográfica se obtiene a través del paquete geoAr, que proporciona datos
-              oficiales de límites administrativos de Argentina."),
+            oficiales de límites administrativos de Argentina."),
+            
             h4("Procesamiento:", style = "color: #4e5b61;"),
             p("Los datos han sido procesados y agregados a nivel provincial y departamental para su
-              visualización en este dashboard. Podés ver el paso a paso", a(href = "https://www.linkedin.com/in/karen-azcurra/", 
-                                                                                "acá.", 
-                                                                                target = "_blank")),
-            h5 ("Contacto:", style=  "color: #4e5b61;"),
+            visualización en este dashboard. Podés ver el paso a paso ",
+              a(href = "https://github.com/kzcrr/shiny-comedores", "acá.", target = "_blank")),
+            
+            h5("Contacto:", style = "color: #4e5b61;"),
             div(
-              style = "display: flex; align-items: center; gap: 8px;",
+              class = "contact-info",
               bs_icon("envelope-at"),
-              p("azcurrakaren@gmail.com", style = "margin: 0;"),
-              div(
-                style = "display: flex; align-items: center; gap: 8px;",
-                bs_icon("linkedin"),
-                a(href = "https://www.linkedin.com/in/karen-azcurra/", 
-                  "karen-azcurra", 
-                  target = "_blank")
-              )
+              p("azcurrakaren@gmail.com", style = "margin: 0;")
+            ),
+            div(
+              class = "contact-info",
+              bs_icon("linkedin"),
+              a(href = "https://www.linkedin.com/in/karen-azcurra/", 
+                "karen-azcurra", 
+                target = "_blank")
+            )
+          ),
+          size = "s",
+          easyClose = TRUE,
+          footer = modalButton("Cerrar")
             )
           )
-        )
-      )
-    }
-  })
+        
+      
+    })
+  } )
+  
+
   
   # Cerrar modal al hacer clic en el overlay
   observeEvent(input$overlay_click, {
@@ -470,12 +478,13 @@ shinyServer(function(input, output, session) {
         }
         
         mapa_base <- mapa_base +
-          get_color_scale(var) +
+          get_color_scale(var, TRUE, selected_provincia()) +
+          labs(title = if(show_amba()) "AMBA" else str_wrap(selected_provincia(), width = 10))+
           theme_void() +
           theme(
             plot.background = element_rect(fill = "transparent", color = NA),
             panel.background = element_rect(fill = "transparent", color = NA),
-            legend.position = c(1, 0.3),
+            legend.position = if(show_legend()) c(1, 0.3) else "none",                
             legend.text = element_text(size = 8),
             legend.title = element_text(size = 9),
             legend.key.size = unit(0.4, "cm")
@@ -545,7 +554,10 @@ shinyServer(function(input, output, session) {
         
         mapa_base <- mapa_base +
           get_color_scale(var, TRUE, selected_provincia()) +
-          labs(title = if(show_amba()) "AMBA" else selected_provincia()) +
+          labs(title = if(show_amba()) "AMBA" else 
+            ifelse(selected_provincia() == "Tierra del Fuego, Antártida e Islas del Atlántico Sur",
+                   "Tierra del Fuego,\nAntártida e Islas del Atlántico Sur",
+                   selected_provincia())) +
           coord_sf(
             xlim = if(is_amba) c(bbox["xmin"] - 0.3, bbox["xmax"] + 0.1) else c(bbox["xmin"] - 0.2, bbox["xmax"] + 1.5),
             ylim = if(is_amba) c(bbox["ymin"] - 0.05, bbox["ymax"] + 0.05) else c(bbox["ymin"] - 0.2, bbox["ymax"] + 0.2),
@@ -557,11 +569,12 @@ shinyServer(function(input, output, session) {
               hjust = 0.5,
               color = "#3b8d99",
               size = if(is_amba) 20 else 16,
-              family = "sans"
+              family = "sans",
+              lineheight = 1.2
             ),
             plot.background = element_rect(fill = "transparent", color = NA),
             panel.background = element_rect(fill = "transparent", color = NA),
-            legend.position = "right",
+            legend.position = if(show_legend()) "right" else "none",
             legend.text = element_text(size = if(is_amba) 10 else 8),
             legend.title = element_text(size = if(is_amba) 12 else 9)
           )
@@ -586,4 +599,4 @@ shinyServer(function(input, output, session) {
       print(paste("Error en el mapa:", e))
     })
   })
-}) 
+})
