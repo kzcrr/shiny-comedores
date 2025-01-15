@@ -11,11 +11,14 @@ library(geoAr)
 library(stringr)
 library(shinyjs)
 library(bsicons)
+library(rsconnect)
 
-mapa_comedores_deptos <- st_read ("C:/Users/kazcu/Desktop/Shinny/shiny/mapa_completo2.geojson")
 
-mapa_comedores_provincia<-st_read("C:/Users/kazcu/Desktop/Shinny/shiny/mapa_completo_provincias_nbi.geojson")
-agrupados_comedores_provincia<- read.xlsx("C:/Users/kazcu/Desktop/Shinny/shiny/comedores/agrupados_comedores_provincia.xlsx")
+mapa_comedores_deptos<-st_read("mapa_completo2.geojson")
+mapa_comedores_provincia<-st_read("mapa_completo_provincias_nbi.geojson")
+
+agrupados_comedores_provincia<-read.xlsx("agrupados_comedores_provincia.xlsx")
+
 
 amba_municipios <- c(
   "Almirante Brown", "Avellaneda", "Berazategui", "Berisso", "Brandsen",
@@ -32,12 +35,11 @@ amba_municipios <- c(
 )
 
 
-NBI <- readxl::read_excel("C:/Users/kazcu/Desktop/Shinny/shiny/comedores/total_depto_nbi.xlsx")
 
 
-mapa_deptos_nbi<-read_sf("C:/Users/kazcu/Desktop/Shinny/shiny/comedores/mapa_nbi_depto_.geojson")
+mapa_deptos_nbi<-read_sf("mapa_nbi_depto_.geojson")
 
-
+#imputo unos datos que se me perdieron en el joint
 
 mapa_comedores_provincia$NBI[is.na(mapa_comedores_provincia$NBI)] <- 28602
 mapa_comedores_provincia$porcentaje[is.na(mapa_comedores_provincia$porcentaje)] <- 15.4
