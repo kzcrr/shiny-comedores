@@ -39,7 +39,15 @@ amba_municipios <- c(
 
 mapa_deptos_nbi<-read_sf("mapa_nbi_depto_.geojson")
 
+
+
+
 #imputo unos datos que se me perdieron en el joint
 
 mapa_comedores_provincia$NBI[is.na(mapa_comedores_provincia$NBI)] <- 28602
 mapa_comedores_provincia$porcentaje[is.na(mapa_comedores_provincia$porcentaje)] <- 15.4
+mapa_deptos_nbi$Departamento[mapa_deptos_nbi$nombre == "Puán"] <- "Puan"
+
+mapa_deptos_nbi$porcentaje_NBI_depto_pobl[mapa_deptos_nbi$Departamento == "Puan"] <- 3.7
+mapa_deptos_nbi$Departamento[mapa_deptos_nbi$nombre == "Juan Felipe Ibarra"] <- "Juan Felipe Ibarra"
+mapa_deptos_nbi$porcentaje_NBI_depto_pobl[mapa_deptos_nbi$Departamento == "Juan Felipe Ibarra"]<- 16.3

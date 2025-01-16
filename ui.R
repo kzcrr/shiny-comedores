@@ -4,8 +4,14 @@
 shinyUI(page_fluid(
   theme = bs_theme(
     bootswatch = "minty",
-    base_font = "sans"
-  ),
+    base_font = c("Montserrat", "sans-serif"),
+    "enable-rounded" = TRUE,
+    "primary" = "#3b8d99"
+  ) |> 
+    bs_add_rules(
+      
+      "@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap');"
+    ),
   useShinyjs(),
   
   tags$head(
@@ -19,8 +25,10 @@ shinyUI(page_fluid(
       }
        
       .modal-dialog {
-        width: 500px !important;  
-        max-width: 90% !important;  
+        width: 90% !important;
+        max-width: 500px !important;
+        margin: 20px auto;
+       
       }
       .modal-content {
         max-height: 80vh;  
@@ -44,12 +52,12 @@ shinyUI(page_fluid(
   }
   .nbi-list li {
     margin-bottom: 8px;
-    text-indent: -1em;  /* Sangría negativa para el guión */
+    text-indent: -1em;  
     
   }
   .nbi-list li::before {
-    content: '● ';     /* Agrega el guión */
-    color: #4e5b61;    /* Color del guión */
+    content: '● ';     
+    color: #4e5b61;    
   }
       #map-wrapper {
         position: absolute;
@@ -181,6 +189,18 @@ shinyUI(page_fluid(
         background-color: #218838;
         border-color: #3b8d99;
       }
+      @media only screen and (max-width: 768px) {
+      body {
+        overflow-x: hidden;
+      }
+      
+      @media only screen and (max-width: 480px) {
+      .overlay-card {
+        font-size: 14px;
+      }
+      
+      #info_plot {
+        height: 200px !important;
       
     "))
   ),

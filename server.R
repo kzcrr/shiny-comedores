@@ -15,7 +15,7 @@ shinyServer(function(input, output, session) {
   show_amba <- reactiveVal(FALSE)
   show_legend <- reactive(!show_storytelling())
   
-
+  
   observe({
     if (show_storytelling()) {
       shinyjs::runjs("document.getElementById('controls-and-cards').className = 'hidden-during-story';")
@@ -95,7 +95,7 @@ shinyServer(function(input, output, session) {
     if (is.null(selected_provincia())) {
       return(9.4)
     }
-
+    
     mean(mapa_comedores_provincia$porcentaje[mapa_comedores_provincia$Provincia == selected_provincia()], na.rm = TRUE)
   })
   
@@ -176,7 +176,7 @@ shinyServer(function(input, output, session) {
     
     story_content <- switch(current_story(),
                             "1" = list(
-                              text = "De acuerdo al último informe del Observatorio de Deuda Social de la UCA (diciembre 2024), 1 de cada 4 hogares argentinos no tiene todas comidas diarias.",
+                              text = "De acuerdo al último informe del Observatorio de Deuda Social de la UCA (diciembre 2024), uno de cada cuatro hogares argentinos no logra cubrir todas sus comidas diarias.",
                               color = "#3b8d99"
                             ),
                             "2" = list(
@@ -286,14 +286,14 @@ shinyServer(function(input, output, session) {
           size = "s",
           easyClose = TRUE,
           footer = modalButton("Cerrar")
-            )
-          )
-        
+        )
+      )
+      
       
     })
   } )
   
-
+  
   
   # Cerrar modal al hacer clic en el overlay
   observeEvent(input$overlay_click, {
@@ -319,11 +319,11 @@ shinyServer(function(input, output, session) {
   })
   
   output$total_asistentes <- renderText({
-    paste("Total de Personas Beneficiadas:", format(total_asistentes_val(), big.mark = ","))
+    paste("Total de personas que asisten:", format(total_asistentes_val(), big.mark = ","))
   })
   
   output$total_nbi <- renderText({
-    paste("Índice Necesidades Básicas Insatisfechas:", format(round(total_nbi_val(), 2), big.mark = ","))
+    paste("Población con Necesidades Básicas Insatisfechas:", format(round(total_nbi_val(), 2), big.mark = ","))
   })
   
   #PLOT
@@ -366,27 +366,27 @@ shinyServer(function(input, output, session) {
         mutate(provincia_wrap = str_wrap(provincia, width = 15)) %>%
         arrange(desc(!!sym(var))) %>%
         slice_head(n = 5)
-    
-    titulo <- if(var == "total_comedores") {
-      "Top 5 provincias con más comedores"
-    } else if(var == "total_asistentes") {
-      "Top 5 provincias con más asistentes"
-    } else {
-      "Top 5 provincias con mayor NBI"
-    }
-    
-    gg <- ggplot(plot_data, 
-                 aes(x = reorder(provincia_wrap, -!!sym(var)), 
-                     y = !!sym(var))) +
-      geom_col_interactive(
-        aes(tooltip = paste0("Provincia: ", provincia, "\n",
-                             ifelse(var == "total_comedores", 
-                                    "Total de Comedores: ", 
-                                    "Total de Asistentes: "),
-                             format(!!sym(var), big.mark = ","))),
-        fill = "#F768A1",
-        width = 0.7
-      )
+      
+      titulo <- if(var == "total_comedores") {
+        "Top 5 provincias con más comedores"
+      } else if(var == "total_asistentes") {
+        "Top 5 provincias con más asistentes"
+      } else {
+        "Top 5 provincias con mayor NBI"
+      }
+      
+      gg <- ggplot(plot_data, 
+                   aes(x = reorder(provincia_wrap, -!!sym(var)), 
+                       y = !!sym(var))) +
+        geom_col_interactive(
+          aes(tooltip = paste0("Provincia: ", provincia, "\n",
+                               ifelse(var == "total_comedores", 
+                                      "Total de Comedores: ", 
+                                      "Total de Asistentes: "),
+                               format(!!sym(var), big.mark = ","))),
+          fill = "#F768A1",
+          width = 0.7
+        )
     }
     
     titulo <- if(var == "total_comedores") {
@@ -497,7 +497,11 @@ shinyServer(function(input, output, session) {
             filter(provincia_nombre %in% c(selected_provincia(), 
                                            if(show_amba() && selected_provincia() == "Buenos Aires") 
                                              "Ciudad Autónoma de Buenos Aires" else NULL)) %>%
-            st_cast("MULTIPOLYGON") %>%
+            mutate(
+              porcentaje_NBI_depto_pobl = as.numeric(as.character(porcentaje_NBI_depto_pobl)),
+              Departamento = gsub("'", "", Departamento)
+            ) %>%
+            filter(!is.na(porcentaje_NBI_depto_pobl)) %>%
             st_make_valid()
           
           validate(
@@ -529,9 +533,12 @@ shinyServer(function(input, output, session) {
               data = deptos_provincia %>% 
                 filter(!is.na(porcentaje_NBI_depto_pobl)),
               aes(fill = porcentaje_NBI_depto_pobl,
-                  tooltip = paste0("Departamento: ", nombre, "\n",
-                                   "NBI: ", format(round(porcentaje_NBI_depto_pobl, 1), decimal.mark=","), "%"),
-                  data_id = nombre),
+                  tooltip = sprintf(
+                    "Departamento: %s\nNBI: %.1f%%",
+                    Departamento,
+                    porcentaje_NBI_depto_pobl
+                  ),
+                  data_id = Departamento),
               color = "white",
               linewidth = 0.1
             )
@@ -590,7 +597,7 @@ shinyServer(function(input, output, session) {
         girafe_options(
           opts_tooltip(css = "background-color:black;color:white;"),
           opts_zoom(min = 1, max = if(is_amba) 2 else 1),
-          opts_sizing(rescale = TRUE, width = 1),
+          opts_sizing(rescale = TRUE, width = 0.9),
           opts_toolbar(saveaspng = FALSE),
           opts_hover(css = "fill:#3b8d99;"),
           opts_selection(type = "single")
