@@ -4,6 +4,7 @@
 # Server
 shinyServer(function(input, output, session) {
   
+  
   #reactividad
   
   current_story <- reactiveVal(1)
@@ -184,7 +185,7 @@ shinyServer(function(input, output, session) {
                               color = "#3b8d99"
                             ),
                             "3" = list(
-                              text = "Cada sección en este mapa oculta todo ese trabajo. Generalmente, realizado por mujeres de clases de populares",
+                              text = "Cada sección en este mapa oculta todo ese trabajo, generalmente realizado por mujeres de clases populares",
                               color = "#3b8d99"
                             ),
                             "4" = list(
@@ -232,7 +233,7 @@ shinyServer(function(input, output, session) {
   })
   
   # Output del modal
-  output$info_modal <- renderUI({
+  
     observeEvent(input$show_info, {
       showModal(
         modalDialog(
@@ -291,7 +292,7 @@ shinyServer(function(input, output, session) {
       
       
     })
-  } )
+  
   
   
   
@@ -329,72 +330,140 @@ shinyServer(function(input, output, session) {
   #PLOT
   output$info_plot <- renderGirafe({
     var <- selected_variable() 
-    titulo <- if(var == "total_comedores") {
-      "Top 5 provincias con más comedores"
-    } else if(var == "total_asistentes") {
-      "Top 5 provincias con más asistentes"
-    } else {
-      "Top 5 provincias con mayor NBI"
-    }
     
-    if(var == "total_nbi") {
-      plot_data <- mapa_comedores_provincia %>%
-        mutate(provincia_wrap = str_wrap(Provincia, width = 15)) %>%
-        arrange(desc(porcentaje)) %>%
-        slice_head(n = 5)
-      
-      gg <- ggplot(plot_data, 
-                   aes(x = reorder(provincia_wrap, -porcentaje), 
-                       y = porcentaje)) +
-        geom_col_interactive(
-          aes(tooltip = paste0("Provincia: ", Provincia, "\n",
-                               "NBI: ", format(round(porcentaje, 1), decimal.mark=","), "%")),
-          fill = "#F768A1",
-          width = 0.7
-        ) +
-        geom_text(aes(label = paste0(format(round(porcentaje, 1), decimal.mark=","), "%")),
-                  vjust = -0.5,
-                  size = 4) +
-        scale_y_continuous(
-          labels = function(x) paste0(format(x, decimal.mark=","), "%"),
-          limits = c(0, max(plot_data$porcentaje) * 1.1)  
-        )
-      
-    } else {
-      
-      plot_data <- agrupados_comedores_provincia %>%
-        mutate(provincia_wrap = str_wrap(provincia, width = 15)) %>%
-        arrange(desc(!!sym(var))) %>%
-        slice_head(n = 5)
-      
-      titulo <- if(var == "total_comedores") {
-        "Top 5 provincias con más comedores"
-      } else if(var == "total_asistentes") {
-        "Top 5 provincias con más asistentes"
+    # Si hay una provincia seleccionada, muestra datos de departamentos
+    if (!is.null(selected_provincia()) && show_dept_map()) {
+      if (var == "total_nbi") {
+        plot_data <- mapa_deptos_nbi %>%
+          filter(provincia_nombre == selected_provincia()) %>%
+          mutate(
+            porcentaje_NBI_depto_pobl = as.numeric(as.character(porcentaje_NBI_depto_pobl)),
+            Departamento = str_wrap(Departamento, width = 15)
+          ) %>%
+          arrange(desc(porcentaje_NBI_depto_pobl)) %>%
+          slice_head(n = 5)
+        
+        gg <- ggplot(plot_data, 
+                     aes(x = reorder(Departamento, -porcentaje_NBI_depto_pobl), 
+                         y = porcentaje_NBI_depto_pobl)) +
+          geom_col_interactive(
+            aes(tooltip = paste0("Departamento: ", Departamento, "\n",
+                                 "NBI: ", format(round(porcentaje_NBI_depto_pobl, 1), decimal.mark=","), "%")),
+            fill = "#F768A1",
+            width = 0.7
+          ) +
+          geom_text(aes(label = paste0(format(round(porcentaje_NBI_depto_pobl, 1), decimal.mark=","), "%")),
+                    vjust = -0.5,
+                    size = 4)
+        
+        titulo <- sprintf("Departamentos con mayor índice de NBI en\n%s",
+                          if (selected_provincia() == "Tierra del Fuego, Antártida e Islas del Atlántico Sur") {
+                            "Tierra del Fuego e Islas"
+                          } else {
+                            selected_provincia()
+                          })%>%
+          str_wrap(width = 30)
+        
       } else {
-        "Top 5 provincias con mayor NBI"
+        plot_data <- mapa_comedores_deptos %>%
+          filter(provincia_nombre == selected_provincia()) %>%
+          mutate(nombre = str_wrap(nombre, width = 15)) %>%
+          arrange(desc(!!sym(var))) %>%
+          slice_head(n = 5)
+        
+        gg <- ggplot(plot_data, 
+                     aes(x = reorder(nombre, -!!sym(var)), 
+                         y = !!sym(var))) +
+          geom_col_interactive(
+            aes(tooltip = paste0("Departamento: ", nombre, "\n",
+                                 ifelse(var == "total_comedores", 
+                                        "Total de Comedores: ", 
+                                        "Total de Asistentes: "),
+                                 format(!!sym(var), big.mark = ","))),
+            fill = "#F768A1",
+            width = 0.7
+          )
+        
+        crear_titulo_desde_de <- function(texto) {
+          # Encuentra la posición del primer "de"
+          pos_de <- regexpr(" de ", texto)[[1]]
+          if (pos_de > 0) {
+            primera_parte <- substr(texto, 1, pos_de - 1)
+            segunda_parte <- substr(texto, pos_de, nchar(texto))
+            return(paste0(primera_parte, "\n", segunda_parte))
+          }
+          return(texto)
+        }
+        
+        titulo <- if (var == "total_nbi") {
+          texto_titulo <- sprintf("Departamentos con mayor índice de NBI en %s",
+                                  if (selected_provincia() == "Tierra del Fuego, Antártida e Islas del Atlántico Sur") {
+                                    "Tierra del Fuego e Islas"
+                                  } else {
+                                    selected_provincia()
+                                  }
+          )
+          crear_titulo_desde_de(texto_titulo)
+        } else {
+          texto_titulo <- sprintf("Departamentos con mayor cantidad de %s en %s",
+                                  if (var == "total_comedores") "comedores" else "asistentes",
+                                  if (selected_provincia() == "Tierra del Fuego, Antártida e Islas del Atlántico Sur") {
+                                    "Tierra del Fuego e Islas"
+                                  } else {
+                                    selected_provincia()
+                                  }
+          )
+          crear_titulo_desde_de(texto_titulo)
+        }
       }
-      
-      gg <- ggplot(plot_data, 
-                   aes(x = reorder(provincia_wrap, -!!sym(var)), 
-                       y = !!sym(var))) +
-        geom_col_interactive(
-          aes(tooltip = paste0("Provincia: ", provincia, "\n",
-                               ifelse(var == "total_comedores", 
-                                      "Total de Comedores: ", 
-                                      "Total de Asistentes: "),
-                               format(!!sym(var), big.mark = ","))),
-          fill = "#F768A1",
-          width = 0.7
-        )
-    }
-    
-    titulo <- if(var == "total_comedores") {
-      "Top 5 provincias con más comedores"
-    } else if(var == "total_asistentes") {
-      "Top 5 provincias con más asistentes"
     } else {
-      "Top 5 provincias con mayor NBI"
+      
+      if(var == "total_nbi") {
+        plot_data <- mapa_comedores_provincia %>%
+          mutate(provincia_wrap = str_wrap(Provincia, width = 15)) %>%
+          arrange(desc(porcentaje)) %>%
+          slice_head(n = 5)
+        
+        gg <- ggplot(plot_data, 
+                     aes(x = reorder(provincia_wrap, -porcentaje), 
+                         y = porcentaje)) +
+          geom_col_interactive(
+            aes(tooltip = paste0("Provincia: ", Provincia, "\n",
+                                 "NBI: ", format(round(porcentaje, 1), decimal.mark=","), "%")),
+            fill = "#F768A1",
+            width = 0.7
+          ) +
+          geom_text(aes(label = paste0(format(round(porcentaje, 1), decimal.mark=","), "%")),
+                    vjust = -0.5,
+                    size = 4)
+        
+        titulo <- "Provincias con mayor índice de NBI"
+        
+      } else {
+        plot_data <- agrupados_comedores_provincia %>%
+          mutate(provincia_wrap = str_wrap(provincia, width = 15)) %>%
+          arrange(desc(!!sym(var))) %>%
+          slice_head(n = 5)
+        
+        gg <- ggplot(plot_data, 
+                     aes(x = reorder(provincia_wrap, -!!sym(var)), 
+                         y = !!sym(var))) +
+          geom_col_interactive(
+            aes(tooltip = paste0("Provincia: ", provincia, "\n",
+                                 ifelse(var == "total_comedores", 
+                                        "Total de Comedores: ", 
+                                        "Total de Asistentes: "),
+                                 format(!!sym(var), big.mark = ","))),
+            fill = "#F768A1",
+            width = 0.7
+          )
+        
+        titulo <- if(var == "total_comedores") {
+          "Provincias con más comedores"
+        } else {
+          "Provincias con más asistentes"
+        }
+      }
     }
     
     gg <- gg +
@@ -408,18 +477,15 @@ shinyServer(function(input, output, session) {
         plot.title = element_text(
           hjust = 0.5, 
           color = "#3b8d99",
-          size = 30,
-          family = "sans"
+          size = 30
         ),
         axis.text.x = element_text(
           color = "#515456",
-          size = 15,
-          family = "sans"
+          size = 15
         ),
         axis.text.y = element_text(
           color = "#515456",
-          size = 12,
-          family = "sans"
+          size = 12
         ),
         panel.grid.major.x = element_blank(),
         panel.grid.minor = element_blank(),
@@ -576,14 +642,16 @@ shinyServer(function(input, output, session) {
               hjust = 0.5,
               color = "#3b8d99",
               size = if(is_amba) 20 else 16,
-              family = "sans",
-              lineheight = 1.2
+              lineheight = 1.2,
             ),
+            plot.title.position = "plot",
             plot.background = element_rect(fill = "transparent", color = NA),
             panel.background = element_rect(fill = "transparent", color = NA),
             legend.position = if(show_legend()) "right" else "none",
-            legend.text = element_text(size = if(is_amba) 10 else 8),
-            legend.title = element_text(size = if(is_amba) 12 else 9)
+            legend.text = element_text(size = if(is_amba) 10 else 8,
+                                       color = "#515456"),
+            legend.title = element_text(size = if(is_amba) 12 else 9,
+                                        color = "#515456")
           )
       }
       
@@ -595,7 +663,7 @@ shinyServer(function(input, output, session) {
              width_svg = if(is_amba) 8 else if(show_dept_map()) 5 else 4,
              height_svg = if(is_amba) 8 else 6) %>%
         girafe_options(
-          opts_tooltip(css = "background-color:black;color:white;"),
+          opts_tooltip(css = "background-color:grey;color:black;padding:10px;border-radius:5px;"),
           opts_zoom(min = 1, max = if(is_amba) 2 else 1),
           opts_sizing(rescale = TRUE, width = 0.9),
           opts_toolbar(saveaspng = FALSE),
