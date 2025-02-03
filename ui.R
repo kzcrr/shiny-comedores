@@ -1,6 +1,3 @@
-
-
-# UI
 shinyUI(page_fluid(
   theme = bs_theme(
     bootswatch = "minty",
@@ -9,31 +6,40 @@ shinyUI(page_fluid(
     "primary" = "#3b8d99"
   ) |> 
     bs_add_rules(
-      
       "@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap');"
     ),
   useShinyjs(),
   
   tags$head(
     tags$style(HTML("
-      body {
+      
+      .body {
+        font-family: Montserrat, sans-serif;
         background-color: white;
         color: black;
         margin: 0;
         padding: 0;
         overflow: hidden;
       }
-       
+      .text *{
+        font-family: 'Montserrat', sans-serif !important;
+      }
+      .bslib-gap-spacing {
+        border: none !important;
+        box-shadow: none !important;
+      }
+      .card {
+        border: none !important;
+        box-shadow: none !important;
+      }
       .modal-dialog {
         width: 90% !important;
         max-width: 500px !important;
         margin: 20px auto;
-       
       }
       .modal-content {
         max-height: 80vh;  
       }
-      
       .modal-body {
         max-height: calc(80vh - 120px);  
         overflow-y: auto;  
@@ -46,40 +52,31 @@ shinyUI(page_fluid(
         margin-top: 10px;
       }
       .nbi-list {
-    list-style: none; 
-    padding-left: 20px;
-    margin-top: 10px;
-  }
-  .nbi-list li {
-    margin-bottom: 8px;
-    text-indent: -1em;  
-    
-  }
-  .nbi-list li::before {
-    content: '● ';     
-    color: #4e5b61;    
-  }
+        list-style: none; 
+        padding-left: 20px;
+        margin-top: 10px;
+      }
+      .nbi-list li {
+        margin-bottom: 8px;
+        text-indent: -1em;  
+      }
+      .nbi-list li::before {
+        content: '● ';     
+        color: #4e5b61;    
+      }
       #map-wrapper {
-        position: absolute;
         top: 0;
         left: 30px;
         width: 100%;
         height: 100vh;
-        z-index: 1;
-        transition: left 0.3s ease
       }
       .national-map {
-    left: 0;
+        left: 0;
       }
       .dept-map {
-    position: absolute;
-    top: 0;
-    left: -250px;  
-    width: calc(100% + 250px);
-    height: 100vh;
-    z-index: 1;
+        top: 12;
+        height: 100vh;
       }
-      /* storytelling */
       #storytelling-overlay {
         position: fixed;
         top: 0;
@@ -112,7 +109,6 @@ shinyUI(page_fluid(
         left: 50%;
         transform: translateX(-50%) rotate(180deg); 
       }
-      
       .story-nav-next {
         position: relative;
         margin-top: 30px;   
@@ -140,7 +136,6 @@ shinyUI(page_fluid(
       .scroll-btn.prev:hover {
         transform: rotate(180deg) translateY(-5px);
       }
-      /* Ocultar elementos durante el storytelling */
       .hidden-during-story {
         opacity: 0;
         pointer-events: none;
@@ -151,13 +146,10 @@ shinyUI(page_fluid(
         pointer-events: auto;
       }
       .overlay-cards {
-        position: absolute;
-        top: 120px;
-        left: 20px;
-        z-index: 2;
         max-width: 600px;
       }
       .overlay-card {
+        font-family: Montserrat, sans-serif !important; 
         margin-bottom: 15px;
         background: #f0f8ff;
         border-radius: 10px;
@@ -166,17 +158,17 @@ shinyUI(page_fluid(
         border: 2px solid #3b8d99;
       }
       .overlay-card h4 {
+        font-family: Montserrat, sans-serif !important; 
         color: #3b8d99;
       }
       .overlay-card p, .overlay-card label {
+        font-family: Montserrat, sans-serif !important; 
         color: #4e5b61;
       }
       .btn-group {
-        position: absolute;
-        top: 70px;
-        left: 50px;
-        z-index: 2;
+        top: 20px;
         margin-bottom: 20px;
+        width: 100%;
       }
       .btn {
         margin-bottom: 10px;
@@ -190,74 +182,75 @@ shinyUI(page_fluid(
         border-color: #3b8d99;
       }
       @media only screen and (max-width: 768px) {
-      body {
-        overflow-x: hidden;
+        body {
+          overflow-x: hidden;
+        }
       }
-      
       @media only screen and (max-width: 480px) {
-      .overlay-card {
-        font-size: 14px;
+        .overlay-card {
+          font-size: 14px;
+        }
+        .info_plot {
+          font-family: Montserrat, sans-serif !important;
+          min-width: 300px;
+          min-height: 400px;
+          width: 100%;
+          height: auto;
+        }
+        .plot-container .ggiraph {
+      font-family: Montserrat, sans-serif !important;
       }
-      
-      #info_plot {
-        height: 200px !important;
-      
+      }
     "))
   ),
   
+  # Capa de storytelling
+  uiOutput("storytelling"),
   
-  div(
-    girafeOutput("map", height = "100vh"),
-    
-
-    
-    # Capa de storytelling
-    uiOutput("storytelling"),
-    #oculto todo para el boton de donde salen estos datos?
-    
-    div(
-      id = "controls-and-cards",
-      class = "hidden-during-story",  
-      div(
-        style = "position: absolute; top: 20px; right:20px; z-index: 1000;",
-        actionButton("show_info", "¿De dónde salen estos datos?",
-                     class = "btn btn-secondary")
-      ),
-      
-      
-      # Modal de información
-      uiOutput("info_modal"),
-      
-      
-      #botones
-      div(
-        class = "btn-group",
-        actionButton("btn_comedores", "Comedores", class = "btn btn-custom-green"),
-        actionButton("btn_asistentes", "Asistentes", class = "btn btn-custom-green"),
-        actionButton("btn_nbi", "NBI", class = "btn btn-custom-green")
-      ),
-      
-      div(
-        class = "overlay-cards",
-        div(
-          class = "overlay-card",
-          h4("Comedores y merenderos 2023"),
-          textOutput("total_comedores"),
-          textOutput("total_asistentes"),
-          textOutput("total_nbi")
-        ),
-        div(
-          class = "overlay-card",
-          girafeOutput("info_plot", height = "300px")
-        )
-        
-        
-        
-        
-      )
-    )
+  # Modal de información
+  uiOutput("info_modal"),
+  
+  layout_columns(col_widths = c(4,4), height = "auto",
+                 div(
+                   id = "controls-and-cards",
+                   class = "hidden-during-story",  
+                   div(
+                     style = "position: absolute; top: 20px; right:20px; z-index: 1000;",
+                     actionButton("show_info", "¿De dónde salen estos datos?",
+                                  class = "btn btn-secondary")
+                   ),
+                   # Botones
+                   div(
+                     class = "btn-group",
+                     actionButton("btn_comedores", "Comedores", class = "btn btn-custom-green"),
+                     actionButton("btn_asistentes", "Asistentes", class = "btn btn-custom-green"),
+                     actionButton("btn_nbi", "NBI", class = "btn btn-custom-green")
+                   ),
+                   div(
+                     class = "overlay-cards", 
+                     div(
+                       class = "overlay-card",
+                       h4("Comedores y merenderos 2023"),
+                       textOutput("total_comedores"),
+                       textOutput("total_asistentes"),
+                       textOutput("total_nbi")
+                     ),
+                     div(
+                       class = "overlay-card",
+                       div(
+                         class = "plot-container",  
+                         girafeOutput("info_plot", width = "100%", height = "400px")
+                       )
+                     )
+                   )
+                 ),
+                 div(br(),
+                     girafeOutput("map", height = "90vh")
+                 ),
+                 div(class = "hidden-during-story")
   ),
-  #BOTON AMBA
+  
+  # BOTON AMBA
   div(
     style = "position: absolute; top: 20px; right: 535px; z-index: 1000;",
     conditionalPanel(
@@ -265,14 +258,13 @@ shinyUI(page_fluid(
       actionButton("btn_amba", "Ver AMBA", class = "btn btn-custom-green")
     )
   ),
-  #BOTON DE "VOLVER AL MAPA NACIONAL"
-  
+  # BOTON DE "VOLVER AL MAPA NACIONAL"
   div(
     style = "position: absolute; top: 20px; right: 300px; z-index: 1000;",
     conditionalPanel(
       condition = "input.map_selected",
       actionButton("return_to_map", "Volver al mapa nacional", 
                    class = "btn btn-custom-green",
-                   style = "margin-bottom: 10px;")))    
-  
+                   style = "margin-bottom: 10px;"))
+  )
 ))
